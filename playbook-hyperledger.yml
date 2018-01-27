@@ -1,0 +1,138 @@
+#
+# https://hyperledger.github.io/composer/installing/installing-prereqs.html
+#
+# https://docs.docker.com/engine/installation/linux/docker-ce/centos/#install-docker-ce-1
+#
+#
+---
+- name: Install Hyperledger Composer
+  hosts: all 
+  
+  vars:
+    fabric_user: fabric
+    fabric_group: fabric
+
+  become: yes
+ 
+  tasks:
+  
+  - name: "Ensure group {{ fabricg_group }} exists"
+    group:
+      name: "{{ fabric_group }}"
+
+  - name: "Ensure user {{ fabric_user }} exists"
+    user:
+      name: "{{ fabric_user }}"
+      group: "{{ fabric_group }}"
+ 
+  - name: Update OS
+    yum:
+      name: "*"
+      state: latest
+    register: update_packages
+
+  - name: Add docker yum repository
+    command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+ 
+  - name: Add IUS repository
+    yum:
+      name:  https://centos7.iuscommunity.org/ius-release.rpm
+      state: present
+
+  - name: Enable epel repository
+    yum:
+      name: epel-release
+      state: present
+
+  - name: Check if Node repository is present
+    shell: yum repolist | grep nodesource
+    register: noderepo_check
+    ignore_errors: yes
+
+  - name: Add Node repository
+    shell: curl --silent --location https://rpm.nodesource.com/setup_8.x | sudo bash -
+    when: noderepo_check|failed
+
+  - name: Install Yum packages
+    yum:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+      - python-pip
+      - docker-ce
+      - nodejs
+      - libsecret
+      - unzip
+
+  # CentOS repo contains old version of git
+  - name: install latest git from ius
+    yum:
+      name: "{{ item }}"
+      enablerepo: ius
+      state: present
+    with_items:
+      - git
+
+  - name: Install PIP libraries
+    pip:
+      name: docker-compose
+      state: latest
+
+  ###########################################################
+  #
+  # Installing development environment
+  #
+  ###########################################################
+  - name: Get Node version
+    shell: node -v | sed -e 's/v//g'
+    register: node_version
+
+  # prevents npm warnings: EACCES user "root" does not have permission to access the dev dir
+  # could also be solved by addeding --unsafe-perm to npm command
+  - name: Ensure node gyp directory is present to prevent   
+    file:
+      path: "{{ item }}"
+      state: directory
+    with_items:
+      - "/usr/lib/node_modules/composer-rest-server/node_modules/pkcs11js/.node-gyp/{{ node_version.stdout }}"
+      - "/usr/lib/node_modules/generator-hyperledger-composer/node_modules/pkcs11js/.node-gyp/{{ node_version.stdout }}"
+     
+  - name: Install development environment
+    npm:
+      name: "{{ item }}"
+      global: yes
+    with_items:
+      - composer-cli
+      - composer-rest-server
+      - generator-hyperledger-composer
+      - yo
+      - composer-playground
+  
+  - name: Start Docker Daemon
+    command: systemctl start docker  
+
+  - name: Check if Hyperledger Fabric is installed
+    shell: ls /opt/fabric-tools/startFabric.sh
+    register: hyperledger_check
+    ignore_errors: yes
+
+  - name: Install Hyperledger Fabric
+    block:
+      - name: Ensure fabric-tools directory exists
+        file:
+          path: /opt/fabric-tools
+          state: directory
+      
+      - name: Download and unzip fabric tools
+        unarchive:
+          src: https://raw.githubusercontent.com/hyperledger/composer-tools/master/packages/fabric-dev-servers/fabric-dev-servers.zip
+          dest: /opt/fabric-tools
+          remote_src: yes
+
+      - name: Execute script that will download a local Hyperledger Fabric runtime
+        command: /opt/fabric-tools/downloadFabric.sh
+
+    when: hyperledger_check|failed
