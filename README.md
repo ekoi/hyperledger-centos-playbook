@@ -24,10 +24,11 @@ This will first download a clean CentOS7 image, that will take some time. After 
 
 ## Usefull Vagrant commands
 
-To pause the box: `vagrant halt`
-To resume a halted box: `vagrant resume`
-To destroy a box: `vagrant destroy`
-To re-provision: `vagrant provision`
+  * To get a shell into the box: `vagrant ssh`
+  * To pause the box: `vagrant halt`
+  * To resume a halted box: `vagrant resume`
+  * To destroy a box: `vagrant destroy`
+  * To re-provision: `vagrant provision`
 
 See for a complete overview: https://www.vagrantup.com/docs/cli/
 
@@ -37,7 +38,9 @@ The CentOS VM is started with a private network setup. Accessing application via
 
 ## Running Ansible
 
-As mentioned earlier, the playbook can be executed against any related OS. Issue the command: `ansible-playbook -i <target-host>, playbook-hyperledger.yml`
+As mentioned earlier, the playbook can be executed against any related OS.
+
+Issue the command: `ansible-playbook -i <target-host>, playbook-hyperledger.yml`
 
 Networking depends on the target machine and is not managed by the playbook and should be handled manually if required.
 
